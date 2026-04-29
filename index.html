@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Neural Dynamics V11 - Perpetual Mind</title>
+    <title>Neural Dynamics V12 - Spontaneous Criticality</title>
     <style>
         body { margin: 0; background: #00050a; color: #00ffcc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         canvas { display: block; }
@@ -40,24 +40,24 @@
 <body>
 
 <div id="ui">
-    <div class="header">PERPETUAL MIND V11</div>
-    <div class="stat"><label>INTERNAL STIMULUS</label><span class="val" id="gVal">5.0x</span></div>
-    <input type="range" id="gainSlider" min="1" max="20" step="0.1" value="5">
-    <div class="stat"><label>BASE METABOLISM</label><span class="val" id="nVal">1.2</span></div>
-    <input type="range" id="noiseSlider" min="0" max="5" step="0.1" value="1.2">
+    <div class="header">SPONTANEOUS MIND V12</div>
+    <div class="stat"><label>SPONTANEITY FORCE</label><span class="val" id="gVal">6.0x</span></div>
+    <input type="range" id="gainSlider" min="1" max="25" step="0.1" value="6">
+    <div class="stat"><label>SYNAPTIC DRIVE</label><span class="val" id="nVal">1.5</span></div>
+    <input type="range" id="noiseSlider" min="0" max="5" step="0.1" value="1.5">
     <div style="margin-top: 20px; border-top: 1px solid #1a3333; padding-top: 15px;">
         <div class="stat">SYNAPSES: <span class="val" id="synCount">0</span></div>
-        <div class="stat">BRAIN ACTIVITY: <span class="val" id="actCount">0%</span></div>
-        <div class="stat">WORLD POS: <span class="val" id="posStat">0, 0</span></div>
+        <div class="stat">NEURAL FLUX: <span class="val" id="actCount">0%</span></div>
+        <div class="stat">MODE: <span class="val" id="cogStat">BOOTING</span></div>
     </div>
-    <button id="btn">FORCE START SYSTEM</button>
+    <button id="btn">INITIALIZE COGNITION</button>
 </div>
 
 <div id="monitor-cluster">
     <div id="entity-container">
         <div id="telemetry-display">
             <div id="vel-display">VELOCITY: 0.00 m/s</div>
-            <div id="thought-display">AUTONOMOUS_MODE</div>
+            <div id="thought-display">INIT_NEURAL_PULSE</div>
         </div>
         <canvas id="entity-space" width="300" height="150"></canvas>
     </div>
@@ -67,6 +67,7 @@
 <canvas id="canvas"></canvas>
 
 <script>
+/** PARAMETRI DI CRITICITÀ **/
 const IZ_A = 0.02, IZ_B = 0.2, IZ_C = -65, IZ_D = 8, V_PEAK = 30, DALE_RATIO = 0.8;
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d', { alpha: false });
@@ -74,9 +75,9 @@ const tCanvas = document.getElementById('thought-monitor'), tCtx = tCanvas.getCo
 const thoughtDisplay = document.getElementById('thought-display'), velDisplay = document.getElementById('vel-display');
 
 let w, h, neurons = [], synapses = [], audioData = new Uint8Array(128), analyser, audioCtx;
-let gain = 5.0, noiseAmp = 1.2, synapseMap = new Map(), history = []; 
+let gain = 6.0, noiseAmp = 1.5, synapseMap = new Map(), history = []; 
 let agent = { worldX: 0, worldY: 0, angle: Math.random() * Math.PI * 2, speed: 0, size: 5, trail: [] };
-let lastThoughtUpdate = 0, firingCount = 0;
+let firingCount = 0;
 
 function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
 window.onresize = resize; resize();
@@ -84,24 +85,33 @@ window.onresize = resize; resize();
 class Neuron {
     constructor(id) {
         this.id = id; this.type = Math.random() < DALE_RATIO ? 'E' : 'I';
-        this.v = IZ_C + (Math.random() * 30); // Stato iniziale randomico per evitare morte immediata
+        this.v = IZ_C + (Math.random() * 40); 
         this.u = IZ_B * this.v;
         this.pos = { x: (Math.random()-0.5)*850, y: (Math.random()-0.5)*550, z: (Math.random()-0.5)*550 };
         this.firingStatus = 0; this.inputCurrent = 0; this.lastSpikeTime = -1000;
-        this.adaptation = 0;
-        this.pacemaker = 0.5 + Math.random() * 2.0; // Spinta costante individuale
-    }
-    update(audioInput, time, globalActivity) {
-        // CORRENTE OMEOSTATICA: Se il cervello è troppo calmo, aumenta la corrente interna
-        let homeostaticDrive = globalActivity < 0.05 ? 1.5 : 0;
         
-        // Input combinato: Sinapsi potenziate + Drive Endogeno + Rumore + Homeostasis
+        // Nuovi parametri di spontaneità
+        this.spontaneityAccumulator = 0; // Cresce finché non spara
+        this.internalRhythm = 0.5 + Math.random() * 1.5; 
+    }
+
+    update(audioInput, time, globalActivity) {
+        // 1. MECCANISMO DI SPONTANEITÀ (LTP-like)
+        // Se l'attività globale è bassa, il neurone diventa più instabile
+        this.spontaneityAccumulator += (0.05 - globalActivity) * 0.1;
+        this.spontaneityAccumulator = Math.max(0.1, this.spontaneityAccumulator);
+
+        // 2. OSCILLATORE ENDOGENO (Theta Wave)
+        let theta = Math.sin(time * 0.003 + (this.id * 0.2)) * 1.2;
+        
+        // 3. CORRENTE TOTALE (I)
+        // Notare il moltiplicatore sulle sinapsi (2.5) per garantire la propagazione
         let I = (audioInput * gain * 0.15) + 
-                (this.inputCurrent * 2.2) + 
+                (this.inputCurrent * 2.5) + 
                 (Math.random() - 0.5) * noiseAmp + 
-                this.pacemaker + 
-                homeostaticDrive - 
-                this.adaptation;
+                this.internalRhythm + 
+                this.spontaneityAccumulator + 
+                theta;
 
         for(let i=0; i<2; i++) {
             this.v += 0.5 * (0.04 * this.v * this.v + 5 * this.v + 140 - this.u + I);
@@ -111,23 +121,23 @@ class Neuron {
         if (this.v >= V_PEAK) {
             this.v = IZ_C; this.u += IZ_D;
             this.firingStatus = 1.0; this.lastSpikeTime = time;
-            this.adaptation += 1.5; 
+            this.spontaneityAccumulator = -2.0; // Reset della spontaneità (periodo refrattario psicologico)
             this.dispatchSpike(time);
         } else { 
-            this.firingStatus *= 0.85; 
-            this.adaptation *= 0.95; 
+            this.firingStatus *= 0.88; 
         }
-        this.inputCurrent *= 0.55; 
+        this.inputCurrent *= 0.5; 
     }
+
     dispatchSpike(time) {
-        if (synapses.length > 2000) return;
+        if (synapses.length > 2200) return;
         neurons.forEach(target => {
             if (this === target) return;
             let d2 = Math.pow(this.pos.x-target.pos.x,2) + Math.pow(this.pos.y-target.pos.y,2);
-            if (d2 < 45000 && Math.random() < 0.05) {
+            if (d2 < 48000 && Math.random() < 0.06) {
                 let key = `${this.id}-${target.id}`, s = synapseMap.get(key);
                 if (!s) { s = new Synapse(this, target); synapses.push(s); synapseMap.set(key, s); }
-                else { let dt = time - target.lastSpikeTime; if (dt > 0 && dt < 40) s.weight = Math.min(6, s.weight * 1.12); }
+                else { let dt = time - target.lastSpikeTime; if (dt > 0 && dt < 50) s.weight = Math.min(6, s.weight * 1.15); }
             }
         });
     }
@@ -136,12 +146,12 @@ class Neuron {
 class Synapse {
     constructor(pre, post) {
         this.pre = pre; this.post = post;
-        this.weight = pre.type === 'E' ? 3.5 : -4.5;
+        this.weight = pre.type === 'E' ? 3.8 : -5.0; // Eccitazione molto potente
         this.life = 1.0; this.key = `${pre.id}-${post.id}`;
     }
     update(crowded) {
-        if (this.pre.firingStatus > 0.8) { this.post.inputCurrent += this.weight; this.life = Math.min(3.0, this.life + 0.1); }
-        this.life -= crowded ? 0.04 : 0.012;
+        if (this.pre.firingStatus > 0.8) { this.post.inputCurrent += this.weight; this.life = Math.min(3.5, this.life + 0.12); }
+        this.life -= crowded ? 0.05 : 0.015;
         return this.life > 0;
     }
 }
@@ -154,22 +164,21 @@ function updateEntity(avgE, avgI) {
     worldObstacles.forEach(obs => {
         obs.x += obs.vx; obs.y += obs.vy; obs.vx *= 0.95; obs.vy *= 0.95;
         let dx = obs.x - agent.worldX, dy = obs.y - agent.worldY, dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < obs.r + 55) steer += Math.sin(agent.angle - Math.atan2(dy, dx)) * 0.28;
+        if (dist < obs.r + 60) steer += Math.sin(agent.angle - Math.atan2(dy, dx)) * 0.3;
         if (dist < obs.r + agent.size) {
             let collAngle = Math.atan2(dy, dx);
-            obs.vx += Math.cos(collAngle) * agent.speed * 0.6; obs.vy += Math.sin(collAngle) * agent.speed * 0.6;
-            agent.angle = collAngle + Math.PI + (Math.random()-0.5); agent.speed *= 0.4;
+            obs.vx += Math.cos(collAngle) * agent.speed * 0.7; obs.vy += Math.sin(collAngle) * agent.speed * 0.7;
+            agent.angle = collAngle + Math.PI + (Math.random()-0.5); agent.speed *= 0.3;
         }
     });
-    agent.angle += (avgE - avgI) + steer + (Math.random()-0.5)*0.07;
-    agent.speed = agent.speed * 0.92 + (avgE * 3.8);
-    if (agent.speed > 12) agent.speed = 12;
+    agent.angle += (avgE - avgI) + steer + (Math.random()-0.5)*0.08;
+    agent.speed = agent.speed * 0.92 + (avgE * 4.2);
+    if (agent.speed > 13) agent.speed = 13;
     agent.worldX += Math.cos(agent.angle) * agent.speed;
     agent.worldY += Math.sin(agent.angle) * agent.speed;
     agent.trail.push({x: agent.worldX, y: agent.worldY});
     if (agent.trail.length > 40) agent.trail.shift();
     velDisplay.innerText = `VELOCITY: ${(agent.speed * 0.35).toFixed(2)} m/s`;
-    document.getElementById('posStat').innerText = `${Math.round(agent.worldX)}, ${Math.round(agent.worldY)}`;
 }
 
 function drawECG() {
@@ -189,7 +198,7 @@ function drawECG() {
 function drawEntitySpace() {
     eCtx.fillStyle = '#000'; eCtx.fillRect(0, 0, eCanvas.width, eCanvas.height);
     const camX = agent.worldX - eCanvas.width/2, camY = agent.worldY - eCanvas.height/2;
-    const gridSize = 50; eCtx.beginPath(); eCtx.strokeStyle = 'rgba(0, 255, 204, 0.15)';
+    const gridSize = 60; eCtx.beginPath(); eCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
     for(let x = - (camX % gridSize); x < eCanvas.width; x += gridSize) { eCtx.moveTo(x, 0); eCtx.lineTo(x, eCanvas.height); }
     for(let y = - (camY % gridSize); y < eCanvas.height; y += gridSize) { eCtx.moveTo(0, y); eCtx.lineTo(eCanvas.width, y); }
     eCtx.stroke();
@@ -211,26 +220,26 @@ function drawEntitySpace() {
 function render() {
     ctx.fillStyle = "rgba(0, 5, 10, 0.5)"; ctx.fillRect(0, 0, w, h);
     if (analyser) analyser.getByteFrequencyData(audioData);
-    let time = performance.now(), totalE = 0, totalI = 0, spikes = 0;
+    let time = performance.now(), totalE = 0, totalI = 0;
     
-    // Calcolo attività globale del frame precedente per omeostasi
-    let currentGlobalAct = firingCount / neurons.length;
-
+    let currentActivity = firingCount / neurons.length;
     firingCount = 0;
+
     neurons.forEach(n => {
-        n.update(audioData[n.id % 128], time, currentGlobalAct);
+        n.update(audioData[n.id % 128], time, currentActivity);
         if (n.firingStatus > 0.5) firingCount++;
         if (n.type === 'E') totalE += n.firingStatus; else totalI += n.firingStatus;
     });
 
-    synapses = synapses.filter(s => s.update(synapses.length > 1500));
-    document.getElementById('synCount').innerText = synapses.length;
-    document.getElementById('actCount').innerText = Math.round((firingCount / neurons.length) * 100) + "%";
+    synapses = synapses.filter(s => s.update(synapses.length > 1800));
     
-    updateEntity(totalE / 200, totalI / 80);
+    document.getElementById('synCount').innerText = synapses.length;
+    document.getElementById('actCount').innerText = Math.round(currentActivity * 100) + "%";
+    document.getElementById('cogStat').innerText = currentActivity > 0.15 ? "HYPER-FOCUS" : "SPONTANEOUS";
+
+    updateEntity(totalE / 180, totalI / 70);
     drawECG(); drawEntitySpace();
 
-    // Rotazione e Proiezione 3D
     let rot = time * 0.00025;
     let proj = neurons.map(n => {
         let x = n.pos.x * Math.cos(rot) - n.pos.z * Math.sin(rot), z = n.pos.x * Math.sin(rot) + n.pos.z * Math.cos(rot);
@@ -238,12 +247,12 @@ function render() {
     });
     synapses.forEach(s => {
         let p1 = proj[s.pre.id], p2 = proj[s.post.id];
-        ctx.strokeStyle = s.pre.type === 'E' ? `rgba(0,255,204,${s.life*0.2})` : `rgba(255,40,100,${s.life*0.2})`;
+        ctx.strokeStyle = s.pre.type === 'E' ? `rgba(0,255,204,${s.life*0.22})` : `rgba(255,40,100,${s.life*0.22})`;
         ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
     });
     proj.forEach(v => {
         ctx.fillStyle = v.n.firingStatus > 0.6 ? "#fff" : (v.n.type === 'E' ? "#00cca3" : "#cc2850");
-        ctx.beginPath(); ctx.arc(v.px, v.py, Math.max(0.5, (v.n.type === 'E' ? 2 : 3) * v.sc), 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(v.px, v.py, Math.max(0.5, (v.n.type === 'E' ? 2.5 : 3.5) * v.sc), 0, Math.PI*2); ctx.fill();
     });
     requestAnimationFrame(render);
 }
@@ -253,9 +262,10 @@ document.getElementById('btn').onclick = async () => {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-        analyser = audioCtx.createAnalyser(); audioCtx.createMediaStreamSource(s).connect(analyser);
-        document.getElementById('btn').innerText = "SYSTEM ACTIVE";
-    } catch(e) { document.getElementById('btn').innerText = "SYSTEM RUNNING (NO MIC)"; }
+        analyser = audioCtx.createAnalyser(); 
+        audioCtx.createMediaStreamSource(s).connect(analyser);
+        document.getElementById('btn').innerText = "CORTEX ONLINE";
+    } catch(e) { document.getElementById('btn').innerText = "CORTEX ACTIVE (DRIVE)"; }
 };
 
 document.getElementById('gainSlider').oninput = (e) => { gain = e.target.value; document.getElementById('gVal').innerText = gain+"x"; };
