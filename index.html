@@ -2,32 +2,39 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Neural Dynamics V12 - Spontaneous Criticality</title>
+    <title>Neural Dynamics V9.7 - Infinite Explorer</title>
     <style>
         body { margin: 0; background: #00050a; color: #00ffcc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         canvas { display: block; }
+        
         #ui { 
             position: absolute; top: 20px; left: 20px; 
             background: rgba(0, 8, 15, 0.9); padding: 20px; 
             border: 1px solid #004444; z-index: 100; width: 320px; 
             border-radius: 8px; backdrop-filter: blur(10px); 
         }
+
         #monitor-cluster { 
             position: absolute; bottom: 20px; right: 20px; 
             display: flex; flex-direction: column; gap: 10px; z-index: 50; 
         }
+        
         #entity-container { 
             background: rgba(0, 15, 25, 0.9); border: 1px solid #00ffcc; 
             border-radius: 4px; overflow: hidden; width: 300px;
         }
+
         #telemetry-display {
             background: #001a1a; color: #fff; font-family: 'Courier New', monospace;
             font-size: 10px; padding: 8px; border-bottom: 1px solid #004444; letter-spacing: 1px;
         }
+
         #vel-display { color: #00ffcc; font-weight: bold; margin-bottom: 4px; }
         #thought-display { color: #fff; text-transform: uppercase; }
+        
         #entity-space { background: #000; }
         #thought-monitor { background: rgba(0, 8, 15, 0.8); border: 1px solid #00ffcc; border-radius: 4px; }
+        
         .header { font-size: 14px; letter-spacing: 2px; font-weight: bold; border-bottom: 1px solid #00ffcc; margin-bottom: 15px; padding-bottom: 8px; color: #fff; }
         .stat { font-size: 10px; margin-bottom: 6px; display: flex; justify-content: space-between; font-family: 'Courier New', monospace; }
         .val { color: #00ffcc; font-weight: bold; }
@@ -40,24 +47,24 @@
 <body>
 
 <div id="ui">
-    <div class="header">SPONTANEOUS MIND V12</div>
-    <div class="stat"><label>SPONTANEITY FORCE</label><span class="val" id="gVal">6.0x</span></div>
-    <input type="range" id="gainSlider" min="1" max="25" step="0.1" value="6">
-    <div class="stat"><label>SYNAPTIC DRIVE</label><span class="val" id="nVal">1.5</span></div>
-    <input type="range" id="noiseSlider" min="0" max="5" step="0.1" value="1.5">
+    <div class="header">CORTICAL EXPLORER V9.7</div>
+    <div class="stat"><label>GAIN (STIMULUS)</label><span class="val" id="gVal">3.0x</span></div>
+    <input type="range" id="gainSlider" min="0.1" max="15" step="0.1" value="3">
+    <div class="stat"><label>INTERNAL NOISE</label><span class="val" id="nVal">0.6</span></div>
+    <input type="range" id="noiseSlider" min="0" max="5" step="0.1" value="0.6">
     <div style="margin-top: 20px; border-top: 1px solid #1a3333; padding-top: 15px;">
         <div class="stat">SYNAPSES: <span class="val" id="synCount">0</span></div>
-        <div class="stat">NEURAL FLUX: <span class="val" id="actCount">0%</span></div>
-        <div class="stat">MODE: <span class="val" id="cogStat">BOOTING</span></div>
+        <div class="stat">MODE: <span class="val" id="modeStat">STABLE</span></div>
+        <div class="stat">WORLD POS: <span class="val" id="posStat">0, 0</span></div>
     </div>
-    <button id="btn">INITIALIZE COGNITION</button>
+    <button id="btn">ACTIVATE CORTEX</button>
 </div>
 
 <div id="monitor-cluster">
     <div id="entity-container">
         <div id="telemetry-display">
             <div id="vel-display">VELOCITY: 0.00 m/s</div>
-            <div id="thought-display">INIT_NEURAL_PULSE</div>
+            <div id="thought-display">SYS_IDLE...</div>
         </div>
         <canvas id="entity-space" width="300" height="150"></canvas>
     </div>
@@ -67,77 +74,77 @@
 <canvas id="canvas"></canvas>
 
 <script>
-/** PARAMETRI DI CRITICITÀ **/
+/** COSTANTI NEURONALI (Modello Izhikevich) **/
 const IZ_A = 0.02, IZ_B = 0.2, IZ_C = -65, IZ_D = 8, V_PEAK = 30, DALE_RATIO = 0.8;
 
+/** ELEMENTI DOM **/
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d', { alpha: false });
 const tCanvas = document.getElementById('thought-monitor'), tCtx = tCanvas.getContext('2d'), eCanvas = document.getElementById('entity-space'), eCtx = eCanvas.getContext('2d');
 const thoughtDisplay = document.getElementById('thought-display'), velDisplay = document.getElementById('vel-display');
 
-let w, h, neurons = [], synapses = [], audioData = new Uint8Array(128), analyser, audioCtx;
-let gain = 6.0, noiseAmp = 1.5, synapseMap = new Map(), history = []; 
+/** STATO **/
+let w, h, neurons = [], synapses = [], audioData, analyser, audioCtx;
+let oscillator, synthGain, gain = 3.0, noiseAmp = 0.6, synapseMap = new Map(), history = []; 
 let agent = { worldX: 0, worldY: 0, angle: Math.random() * Math.PI * 2, speed: 0, size: 5, trail: [] };
-let firingCount = 0;
+let lastThoughtUpdate = 0, currentCollision = false, currentProximity = false;
+
+const thoughts = {
+    high_noise: ["DIFFAZIONE SEGNALE", "INTERFERENZA STOCASTICA", "RUMORE DI FONDO"],
+    low_activity: ["IDLE NEURALE", "QUIETE SINAPTICA"],
+    high_excitory: ["FOCUS ATTIVO", "CALCOLO VETTORE", "POTENZIAMENTO"],
+    high_inhibitory: ["FILTRO SENSORIALE", "INIBIZIONE", "OMEOSTASI"],
+    collision: ["SHOCK COLLISIONE", "EMERGENZA", "RINCULO"],
+    proximity: ["ANALISI OSTACOLO", "DEVIAZIONE"]
+};
+
+// Ostacoli nel mondo
+let worldObstacles = [];
+for(let i=0; i<60; i++) {
+    worldObstacles.push({
+        x: (Math.random() - 0.5) * 4000,
+        y: (Math.random() - 0.5) * 4000,
+        r: 15 + Math.random() * 30,
+        vx: 0, vy: 0
+    });
+}
 
 function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
 window.onresize = resize; resize();
 
+/** CLASSI CORE **/
 class Neuron {
     constructor(id) {
         this.id = id; this.type = Math.random() < DALE_RATIO ? 'E' : 'I';
-        this.v = IZ_C + (Math.random() * 40); 
-        this.u = IZ_B * this.v;
+        this.v = IZ_C; this.u = IZ_B * this.v;
         this.pos = { x: (Math.random()-0.5)*850, y: (Math.random()-0.5)*550, z: (Math.random()-0.5)*550 };
         this.firingStatus = 0; this.inputCurrent = 0; this.lastSpikeTime = -1000;
-        
-        // Nuovi parametri di spontaneità
-        this.spontaneityAccumulator = 0; // Cresce finché non spara
-        this.internalRhythm = 0.5 + Math.random() * 1.5; 
+        this.spontaneousBias = 0.4 + Math.random() * 0.2;
     }
-
-    update(audioInput, time, globalActivity) {
-        // 1. MECCANISMO DI SPONTANEITÀ (LTP-like)
-        // Se l'attività globale è bassa, il neurone diventa più instabile
-        this.spontaneityAccumulator += (0.05 - globalActivity) * 0.1;
-        this.spontaneityAccumulator = Math.max(0.1, this.spontaneityAccumulator);
-
-        // 2. OSCILLATORE ENDOGENO (Theta Wave)
-        let theta = Math.sin(time * 0.003 + (this.id * 0.2)) * 1.2;
+    update(audioInput, time) {
+        // CORREZIONE: Moltiplicato il rumore per 8 per renderlo incisivo nel modello Izhikevich
+        let noise = (Math.random() - 0.5) * (noiseAmp * 8);
+        let I = (audioInput * gain * 0.12) + this.inputCurrent + noise + this.spontaneousBias;
         
-        // 3. CORRENTE TOTALE (I)
-        // Notare il moltiplicatore sulle sinapsi (2.5) per garantire la propagazione
-        let I = (audioInput * gain * 0.15) + 
-                (this.inputCurrent * 2.5) + 
-                (Math.random() - 0.5) * noiseAmp + 
-                this.internalRhythm + 
-                this.spontaneityAccumulator + 
-                theta;
-
         for(let i=0; i<2; i++) {
             this.v += 0.5 * (0.04 * this.v * this.v + 5 * this.v + 140 - this.u + I);
             this.u += 0.5 * IZ_A * (IZ_B * this.v - this.u);
         }
-
         if (this.v >= V_PEAK) {
             this.v = IZ_C; this.u += IZ_D;
             this.firingStatus = 1.0; this.lastSpikeTime = time;
-            this.spontaneityAccumulator = -2.0; // Reset della spontaneità (periodo refrattario psicologico)
             this.dispatchSpike(time);
-        } else { 
-            this.firingStatus *= 0.88; 
-        }
-        this.inputCurrent *= 0.5; 
+        } else { this.firingStatus *= 0.85; }
+        this.inputCurrent *= 0.5;
     }
-
     dispatchSpike(time) {
-        if (synapses.length > 2200) return;
+        if (synapses.length > 1500) return;
         neurons.forEach(target => {
             if (this === target) return;
             let d2 = Math.pow(this.pos.x-target.pos.x,2) + Math.pow(this.pos.y-target.pos.y,2);
-            if (d2 < 48000 && Math.random() < 0.06) {
+            if (d2 < 40000 && Math.random() < 0.02) {
                 let key = `${this.id}-${target.id}`, s = synapseMap.get(key);
                 if (!s) { s = new Synapse(this, target); synapses.push(s); synapseMap.set(key, s); }
-                else { let dt = time - target.lastSpikeTime; if (dt > 0 && dt < 50) s.weight = Math.min(6, s.weight * 1.15); }
+                else { let dt = time - target.lastSpikeTime; if (dt > 0 && dt < 25) s.weight = Math.min(3.5, s.weight * 1.05); }
             }
         });
     }
@@ -146,75 +153,115 @@ class Neuron {
 class Synapse {
     constructor(pre, post) {
         this.pre = pre; this.post = post;
-        this.weight = pre.type === 'E' ? 3.8 : -5.0; // Eccitazione molto potente
+        this.weight = pre.type === 'E' ? 1.4 : -2.2;
         this.life = 1.0; this.key = `${pre.id}-${post.id}`;
     }
     update(crowded) {
-        if (this.pre.firingStatus > 0.8) { this.post.inputCurrent += this.weight; this.life = Math.min(3.5, this.life + 0.12); }
-        this.life -= crowded ? 0.05 : 0.015;
-        return this.life > 0;
+        if (this.pre.firingStatus > 0.8) { this.post.inputCurrent += this.weight; this.life = Math.min(2.0, this.life + 0.04); }
+        this.life -= crowded ? 0.025 : 0.01;
+        if (this.life <= 0) { synapseMap.delete(this.key); return false; }
+        return true;
     }
 }
 
-let worldObstacles = [];
-for(let i=0; i<60; i++) worldObstacles.push({ x: (Math.random()-0.5)*4000, y: (Math.random()-0.5)*4000, r: 15+Math.random()*30, vx: 0, vy: 0 });
-
+/** MOVIMENTO E CAMERA **/
 function updateEntity(avgE, avgI) {
-    let steer = 0;
+    currentProximity = false; currentCollision = false;
+    let avoidanceSteer = 0;
+
     worldObstacles.forEach(obs => {
-        obs.x += obs.vx; obs.y += obs.vy; obs.vx *= 0.95; obs.vy *= 0.95;
-        let dx = obs.x - agent.worldX, dy = obs.y - agent.worldY, dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < obs.r + 60) steer += Math.sin(agent.angle - Math.atan2(dy, dx)) * 0.3;
+        obs.x += obs.vx; obs.y += obs.vy;
+        obs.vx *= 0.95; obs.vy *= 0.95;
+
+        let dx = obs.x - agent.worldX, dy = obs.y - agent.worldY;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < obs.r + 45) {
+            currentProximity = true;
+            avoidanceSteer += Math.sin(agent.angle - Math.atan2(dy, dx)) * 0.15;
+        }
         if (dist < obs.r + agent.size) {
+            currentCollision = true;
             let collAngle = Math.atan2(dy, dx);
-            obs.vx += Math.cos(collAngle) * agent.speed * 0.7; obs.vy += Math.sin(collAngle) * agent.speed * 0.7;
-            agent.angle = collAngle + Math.PI + (Math.random()-0.5); agent.speed *= 0.3;
+            obs.vx += Math.cos(collAngle) * agent.speed * 0.4;
+            obs.vy += Math.sin(collAngle) * agent.speed * 0.4;
+            agent.angle = collAngle + Math.PI + (Math.random()-0.5);
+            agent.speed *= 0.5;
         }
     });
-    agent.angle += (avgE - avgI) + steer + (Math.random()-0.5)*0.08;
-    agent.speed = agent.speed * 0.92 + (avgE * 4.2);
-    if (agent.speed > 13) agent.speed = 13;
+
+    // L'instabilità del rumore influenza ora anche la direzione dell'agente
+    let jitter = (Math.random()-0.5) * (noiseAmp * 0.05);
+    agent.angle += (avgE * 0.5 - avgI * 0.6) + avoidanceSteer + jitter;
+    agent.speed = agent.speed * 0.85 + (avgE + avgI) * 1.8;
+    if (agent.speed > 8) agent.speed = 8;
+
     agent.worldX += Math.cos(agent.angle) * agent.speed;
     agent.worldY += Math.sin(agent.angle) * agent.speed;
-    agent.trail.push({x: agent.worldX, y: agent.worldY});
-    if (agent.trail.length > 40) agent.trail.shift();
-    velDisplay.innerText = `VELOCITY: ${(agent.speed * 0.35).toFixed(2)} m/s`;
-}
 
-function drawECG() {
-    tCtx.fillStyle = '#00080f'; tCtx.fillRect(0, 0, tCanvas.width, tCanvas.height);
-    if (history.length > tCanvas.width) history.shift();
-    history.push(neurons.slice(0, 5).map(n => n.v));
-    for(let i=0; i<5; i++) {
-        tCtx.beginPath(); tCtx.strokeStyle = i % 2 === 0 ? '#00ffcc' : '#ff2864';
-        history.forEach((h, j) => {
-            let y = tCanvas.height - ((h[i] + 80) * (tCanvas.height / 120));
-            if (j === 0) tCtx.moveTo(j, y); else tCtx.lineTo(j, y);
-        });
-        tCtx.stroke();
-    }
+    agent.trail.push({x: agent.worldX, y: agent.worldY});
+    if (agent.trail.length > 30) agent.trail.shift();
+
+    velDisplay.innerText = `VELOCITY: ${(agent.speed * 0.35).toFixed(2)} m/s`;
+    document.getElementById('posStat').innerText = `${Math.round(agent.worldX)}, ${Math.round(agent.worldY)}`;
 }
 
 function drawEntitySpace() {
     eCtx.fillStyle = '#000'; eCtx.fillRect(0, 0, eCanvas.width, eCanvas.height);
     const camX = agent.worldX - eCanvas.width/2, camY = agent.worldY - eCanvas.height/2;
-    const gridSize = 60; eCtx.beginPath(); eCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
+
+    const gridSize = 50;
+    eCtx.beginPath(); eCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
     for(let x = - (camX % gridSize); x < eCanvas.width; x += gridSize) { eCtx.moveTo(x, 0); eCtx.lineTo(x, eCanvas.height); }
     for(let y = - (camY % gridSize); y < eCanvas.height; y += gridSize) { eCtx.moveTo(0, y); eCtx.lineTo(eCanvas.width, y); }
     eCtx.stroke();
+
     worldObstacles.forEach(obs => {
         let sx = obs.x - camX, sy = obs.y - camY;
         if(sx > -50 && sx < 350 && sy > -50 && sy < 200) {
-            eCtx.strokeStyle = '#ff2864'; eCtx.beginPath(); eCtx.arc(sx, sy, obs.r, 0, Math.PI*2); eCtx.stroke();
+            eCtx.fillStyle = '#ff286422'; eCtx.strokeStyle = '#ff2864';
+            eCtx.beginPath(); eCtx.arc(sx, sy, obs.r, 0, Math.PI*2); eCtx.fill(); eCtx.stroke();
         }
     });
+
     eCtx.beginPath(); eCtx.strokeStyle = '#00ffcc'; eCtx.lineWidth = 2;
     agent.trail.forEach((p, i) => {
         let sx = p.x - camX, sy = p.y - camY;
         if(i===0) eCtx.moveTo(sx, sy); else eCtx.lineTo(sx, sy);
     });
     eCtx.stroke();
+
     eCtx.fillStyle = '#fff'; eCtx.beginPath(); eCtx.arc(eCanvas.width/2, eCanvas.height/2, agent.size, 0, Math.PI*2); eCtx.fill();
+}
+
+function updateThoughtText(avgE, avgI) {
+    let now = performance.now();
+    if (now - lastThoughtUpdate < 1200) return;
+    lastThoughtUpdate = now;
+    
+    let pool;
+    if (currentCollision) pool = thoughts.collision;
+    else if (currentProximity) pool = thoughts.proximity;
+    else if (noiseAmp > 3.0) pool = thoughts.high_noise;
+    else if (avgE > 0.06) pool = thoughts.high_excitory;
+    else if (avgI > 0.03) pool = thoughts.high_inhibitory;
+    else pool = thoughts.low_activity;
+
+    thoughtDisplay.innerText = `LOG: ${pool[Math.floor(Math.random() * pool.length)]}`;
+}
+
+function drawWaveform() {
+    tCtx.fillStyle = '#00080f'; tCtx.fillRect(0, 0, tCanvas.width, tCanvas.height);
+    if (history.length > tCanvas.width) history.shift();
+    history.push(neurons.slice(0,5).map(n => n.v));
+    for(let i=0; i<5; i++) {
+        tCtx.beginPath(); tCtx.strokeStyle = i % 2 === 0 ? '#00ffcc' : '#ff2864';
+        history.forEach((h, j) => {
+            let y = tCanvas.height - ((h[i] + 70) * (tCanvas.height / 110));
+            if (j === 0) tCtx.moveTo(j, y); else tCtx.lineTo(j, y);
+        });
+        tCtx.stroke();
+    }
 }
 
 function render() {
@@ -222,54 +269,69 @@ function render() {
     if (analyser) analyser.getByteFrequencyData(audioData);
     let time = performance.now(), totalE = 0, totalI = 0;
     
-    let currentActivity = firingCount / neurons.length;
-    firingCount = 0;
+    let crowded = synapses.length > 1000;
+    document.getElementById('modeStat').innerText = crowded ? "PRUNING ACTIVE" : "STABLE";
+    document.getElementById('modeStat').style.color = crowded ? "#ff2864" : "#00ffcc";
 
     neurons.forEach(n => {
-        n.update(audioData[n.id % 128], time, currentActivity);
-        if (n.firingStatus > 0.5) firingCount++;
+        n.update((audioData && audioData[n.id % 128]) || 0, time);
         if (n.type === 'E') totalE += n.firingStatus; else totalI += n.firingStatus;
     });
 
-    synapses = synapses.filter(s => s.update(synapses.length > 1800));
-    
+    synapses = synapses.filter(s => s.update(crowded));
     document.getElementById('synCount').innerText = synapses.length;
-    document.getElementById('actCount').innerText = Math.round(currentActivity * 100) + "%";
-    document.getElementById('cogStat').innerText = currentActivity > 0.15 ? "HYPER-FOCUS" : "SPONTANEOUS";
-
-    updateEntity(totalE / 180, totalI / 70);
-    drawECG(); drawEntitySpace();
-
-    let rot = time * 0.00025;
-    let proj = neurons.map(n => {
+    
+    updateEntity(totalE / 240, totalI / 60);
+    updateThoughtText(totalE / 240, totalI / 60);
+    drawEntitySpace(); drawWaveform();
+    
+    let rot = time * 0.0002;
+    let projection = neurons.map(n => {
         let x = n.pos.x * Math.cos(rot) - n.pos.z * Math.sin(rot), z = n.pos.x * Math.sin(rot) + n.pos.z * Math.cos(rot);
-        let sc = 850 / (z + 1000); return { n, px: x * sc + w/2, py: n.pos.y * sc + h/2, sc };
+        let scale = 850 / (z + 1000);
+        return { n, px: x * scale + w/2, py: n.pos.y * scale + h/2, sc: scale };
     });
+    
     synapses.forEach(s => {
-        let p1 = proj[s.pre.id], p2 = proj[s.post.id];
-        ctx.strokeStyle = s.pre.type === 'E' ? `rgba(0,255,204,${s.life*0.22})` : `rgba(255,40,100,${s.life*0.22})`;
-        ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
+        let p1 = projection[s.pre.id], p2 = projection[s.post.id];
+        if (p1.sc > 0.1) {
+            ctx.strokeStyle = s.pre.type === 'E' ? `rgba(0, 255, 204, ${s.life * 0.2})` : `rgba(255, 40, 100, ${s.life * 0.2})`;
+            ctx.lineWidth = s.life * 0.5;
+            ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
+        }
     });
-    proj.forEach(v => {
-        ctx.fillStyle = v.n.firingStatus > 0.6 ? "#fff" : (v.n.type === 'E' ? "#00cca3" : "#cc2850");
-        ctx.beginPath(); ctx.arc(v.px, v.py, Math.max(0.5, (v.n.type === 'E' ? 2.5 : 3.5) * v.sc), 0, Math.PI*2); ctx.fill();
+    
+    projection.forEach(v => {
+        ctx.fillStyle = v.n.firingStatus > 0.5 ? "#fff" : (v.n.type === 'E' ? "#00cca3" : "#cc2850");
+        ctx.beginPath(); ctx.arc(v.px, v.py, Math.max(0.5, (v.n.type === 'E' ? 2 : 3) * v.sc), 0, Math.PI*2); ctx.fill();
     });
+
     requestAnimationFrame(render);
 }
 
 document.getElementById('btn').onclick = async () => {
     if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     try {
-        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         analyser = audioCtx.createAnalyser(); 
-        audioCtx.createMediaStreamSource(s).connect(analyser);
+        audioCtx.createMediaStreamSource(stream).connect(analyser);
+        audioData = new Uint8Array(analyser.frequencyBinCount);
         document.getElementById('btn').innerText = "CORTEX ONLINE";
-    } catch(e) { document.getElementById('btn').innerText = "CORTEX ACTIVE (DRIVE)"; }
+        document.getElementById('btn').style.background = "#fff";
+    } catch(e) {
+        alert("Audio access denied or not supported.");
+    }
 };
 
-document.getElementById('gainSlider').oninput = (e) => { gain = e.target.value; document.getElementById('gVal').innerText = gain+"x"; };
-document.getElementById('noiseSlider').oninput = (e) => { noiseAmp = e.target.value; document.getElementById('nVal').innerText = noiseAmp; };
+document.getElementById('gainSlider').oninput = (e) => { 
+    gain = parseFloat(e.target.value); 
+    document.getElementById('gVal').innerText = gain.toFixed(1)+"x"; 
+};
+document.getElementById('noiseSlider').oninput = (e) => { 
+    noiseAmp = parseFloat(e.target.value); 
+    document.getElementById('nVal').innerText = noiseAmp.toFixed(1); 
+};
 
 for(let i=0; i<300; i++) neurons.push(new Neuron(i));
 render();
